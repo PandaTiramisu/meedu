@@ -17,18 +17,76 @@ use App\Models\Role;
 use App\Models\Order;
 use App\Models\Video;
 use App\Models\Course;
+use App\Models\Socialite;
+use App\Models\OrderGoods;
+use Illuminate\Support\Str;
 use App\Models\VideoComment;
 use App\Models\CourseComment;
-use App\Models\RechargePayment;
 use App\Models\UserJoinRoleRecord;
+use Illuminate\Support\Facades\DB;
 use Laravel\Passport\HasApiTokens;
+use Illuminate\Support\Facades\Hash;
 use App\Models\traits\CreatedAtBetween;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 
+/**
+ * App\User.
+ *
+ * @property int                                                                                                       $id
+ * @property \Illuminate\Config\Repository|mixed                                                                       $avatar
+ * @property string                                                                                                    $nick_name
+ * @property string                                                                                                    $mobile
+ * @property string                                                                                                    $password
+ * @property int                                                                                                       $credit1
+ * @property int                                                                                                       $credit2
+ * @property int                                                                                                       $credit3
+ * @property int                                                                                                       $is_active       1:active,-1:unactive
+ * @property int                                                                                                       $is_lock         1:lock,-1:unlock
+ * @property string|null                                                                                               $remember_token
+ * @property \Illuminate\Support\Carbon|null                                                                           $created_at
+ * @property \Illuminate\Support\Carbon|null                                                                           $updated_at
+ * @property int                                                                                                       $role_id         角色ID
+ * @property string|null                                                                                               $role_expired_at 过期时间
+ * @property \Illuminate\Database\Eloquent\Collection|\App\Models\Video[]                                              $buyVideos
+ * @property \Illuminate\Database\Eloquent\Collection|\Laravel\Passport\Client[]                                       $clients
+ * @property \Illuminate\Database\Eloquent\Collection|\App\Models\CourseComment[]                                      $courseComments
+ * @property \Illuminate\Database\Eloquent\Collection|\App\Models\Course[]                                             $courses
+ * @property \Illuminate\Database\Eloquent\Collection|\App\Models\Course[]                                             $joinCourses
+ * @property \Illuminate\Database\Eloquent\Collection|\App\Models\UserJoinRoleRecord[]                                 $joinRoles
+ * @property \Illuminate\Notifications\DatabaseNotificationCollection|\Illuminate\Notifications\DatabaseNotification[] $notifications
+ * @property \Illuminate\Database\Eloquent\Collection|\App\Models\Order[]                                              $orders
+ * @property \App\Models\Role                                                                                          $role
+ * @property \Illuminate\Database\Eloquent\Collection|\App\Models\Socialite[]                                          $socialite
+ * @property \Illuminate\Database\Eloquent\Collection|\Laravel\Passport\Token[]                                        $tokens
+ * @property \Illuminate\Database\Eloquent\Collection|\App\Models\VideoComment[]                                       $videoComments
+ *
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\User createdAtBetween($startDate, $endDate)
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\User newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\User newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\User query()
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\User whereAvatar($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\User whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\User whereCredit1($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\User whereCredit2($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\User whereCredit3($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\User whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\User whereIsActive($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\User whereIsLock($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\User whereMobile($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\User whereNickName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\User wherePassword($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\User whereRememberToken($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\User whereRoleExpiredAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\User whereRoleId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\User whereUpdatedAt($value)
+ * @mixin \Eloquent
+ */
 class User extends Authenticatable
 {
-    use Notifiable, CreatedAtBetween, HasApiTokens;
+    use Notifiable;
+    use CreatedAtBetween;
+    use HasApiTokens;
 
     const ACTIVE_YES = 1;
     const ACTIVE_NO = -1;
@@ -53,10 +111,6 @@ class User extends Authenticatable
      */
     protected $hidden = [
         'password', 'remember_token',
-    ];
-
-    protected $appends = [
-        'show_url', 'credit1_text', 'credit2_text', 'credit3_text',
     ];
 
     /**
@@ -123,26 +177,6 @@ class User extends Authenticatable
             ->withPivot('created_at', 'charge');
     }
 
-    public function getShowUrlAttribute()
-    {
-        return route('backend.member.show', $this);
-    }
-
-    public function getCredit1TextAttribute()
-    {
-        return config('meedu.credit.credit1.name');
-    }
-
-    public function getCredit2TextAttribute()
-    {
-        return config('meedu.credit.credit2.name');
-    }
-
-    public function getCredit3TextAttribute()
-    {
-        return config('meedu.credit.credit3.name');
-    }
-
     /**
      * 用户的课程评论.
      *
@@ -204,16 +238,6 @@ class User extends Authenticatable
     }
 
     /**
-     * 充值订单.
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
-     */
-    public function rechargePayments()
-    {
-        return $this->hasMany(RechargePayment::class, 'user_id');
-    }
-
-    /**
      * 关联订单.
      *
      * @return \Illuminate\Database\Eloquent\Relations\HasMany
@@ -244,7 +268,7 @@ class User extends Authenticatable
     public function canSeeThisVideo(Video $video)
     {
         $course = $video->course;
-        if ($video->charge == 0 && $course->charge == 0) {
+        if ($course->charge == 0 || $video->charge == 0) {
             return true;
         }
 
@@ -270,7 +294,7 @@ class User extends Authenticatable
      */
     public function activeRole()
     {
-        return time() < strtotime($this->role_expired_at);
+        return $this->role_id && time() < strtotime($this->role_expired_at);
     }
 
     /**
@@ -321,5 +345,102 @@ class User extends Authenticatable
             Carbon::now()->format('Y-m-d'),
             Carbon::now()->addDays(1)->format('Y-m-d')
         )->count();
+    }
+
+    /**
+     * 订单成功的处理.
+     *
+     * @param Order $order
+     *
+     * @return bool
+     *
+     * @throws \Throwable
+     */
+    public function handlerOrderSuccess(Order $order)
+    {
+        $goods = $order->goods;
+        DB::beginTransaction();
+        try {
+            foreach ($goods as $goodsItem) {
+                switch ($goodsItem->goods_type) {
+                    case OrderGoods::GOODS_TYPE_COURSE:
+                        $course = Course::find($goodsItem->goods_id);
+                        $this->joinACourse($course);
+                        break;
+                    case OrderGoods::GOODS_TYPE_VIDEO:
+                        $video = Video::find($goodsItem->goods_id);
+                        $this->buyAVideo($video);
+                        break;
+                    case OrderGoods::GOODS_TYPE_ROLE:
+                        $role = Role::find($goodsItem->goods_id);
+                        $this->buyRole($role);
+                        break;
+                }
+            }
+
+            DB::commit();
+
+            return true;
+        } catch (Exception $exception) {
+            DB::rollBack();
+            exception_record($exception);
+
+            return false;
+        }
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function socialite()
+    {
+        return $this->hasMany(Socialite::class, 'user_id');
+    }
+
+    /**
+     * @param $name
+     * @param $avatar
+     *
+     * @return mixed
+     */
+    public static function createUser($name, $avatar)
+    {
+        return User::create([
+            'avatar' => $avatar ?: config('meedu.member.default_avatar'),
+            'nick_name' => $name ?? '',
+            'mobile' => mt_rand(2, 9).mt_rand(1000, 9999).mt_rand(1000, 9999),
+            'password' => Hash::make(Str::random(6)),
+            'is_lock' => config('meedu.member.is_lock_default'),
+            'is_active' => config('meedu.member.is_active_default'),
+            'role_id' => 0,
+            'role_expired_at' => Carbon::now(),
+        ]);
+    }
+
+    /**
+     * 绑定Socialite.
+     *
+     * @param $app
+     * @param $socialite
+     *
+     * @return false|\Illuminate\Database\Eloquent\Model
+     */
+    public function bindSocialite($app, $socialite)
+    {
+        return $this->socialite()->save(new Socialite([
+            'app' => $app,
+            'app_user_id' => $socialite->getId(),
+            'data' => serialize($socialite),
+        ]));
+    }
+
+    /**
+     * 判断是否绑定手机.
+     *
+     * @return bool
+     */
+    public function isBindMobile()
+    {
+        return substr($this->mobile, 0, 1) == 1;
     }
 }

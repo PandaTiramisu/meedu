@@ -30,7 +30,12 @@ class BackendPermissionCheckMiddleware
             return $next($request);
         }
         if (! $admin->couldVisited($request)) {
-            abort(401);
+            if ($request->wantsJson()) {
+                return response()->json(['code' => 401, 'message' => '无权限']);
+            }
+            flash('无权限', 'error');
+
+            return back();
         }
 
         return $next($request);

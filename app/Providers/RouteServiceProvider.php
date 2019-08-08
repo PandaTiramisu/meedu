@@ -50,17 +50,20 @@ class RouteServiceProvider extends ServiceProvider
      */
     protected function mapWebRoutes()
     {
-        Route::middleware(['web', 'user.share'])
+        Route::middleware(['web', 'user.share', 'nav.share'])
              ->namespace($this->namespace)
              ->group(base_path('routes/web.php'));
     }
 
+    /**
+     * 加载后台路由.
+     */
     protected function mapWebBackendRoutes()
     {
         Route::prefix('backend')
             ->middleware(['web', 'user.share'])
             ->namespace($this->namespace.'\Backend')
-            ->group(base_path('routes/web_backend.php'));
+            ->group(base_path('routes/backend.php'));
     }
 
     /**

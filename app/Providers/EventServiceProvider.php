@@ -34,6 +34,12 @@ class EventServiceProvider extends ServiceProvider
         'App\Events\PaymentSuccessEvent' => [
             'App\Listeners\PaymentSuccessListener',
         ],
+        'App\Events\AdFromEvent' => [
+            'App\Listeners\AdFromListener',
+        ],
+        'SocialiteProviders\Manager\SocialiteWasCalled' => [
+            'SocialiteProviders\\QQ\\QqExtendSocialite@handle',
+        ],
     ];
 
     /**

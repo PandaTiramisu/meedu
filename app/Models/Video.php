@@ -12,9 +12,69 @@
 namespace App\Models;
 
 use App\User;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * App\Models\Video.
+ *
+ * @property int                                                                 $id
+ * @property int                                                                 $user_id
+ * @property int                                                                 $course_id
+ * @property string                                                              $title             标题
+ * @property string                                                              $slug              slug
+ * @property string                                                              $url               播放地址
+ * @property int                                                                 $charge            价格
+ * @property int                                                                 $view_num          观看次数
+ * @property string                                                              $short_description 简短介绍
+ * @property string                                                              $description       详细介绍
+ * @property string                                                              $seo_keywords      SEO关键字
+ * @property string                                                              $seo_description   SEO描述
+ * @property string|null                                                         $published_at      上线时间
+ * @property int                                                                 $is_show           1显示,-1隐藏
+ * @property string|null                                                         $deleted_at
+ * @property \Illuminate\Support\Carbon|null                                     $created_at
+ * @property \Illuminate\Support\Carbon|null                                     $updated_at
+ * @property string|null                                                         $aliyun_video_id
+ * @property int                                                                 $chapter_id
+ * @property int                                                                 $duration          时长，单位：秒
+ * @property string|null                                                         $tencent_video_id  腾讯云video_id
+ * @property \Illuminate\Database\Eloquent\Collection|\App\User[]                $buyUsers
+ * @property \App\Models\CourseChapter                                           $chapter
+ * @property \Illuminate\Database\Eloquent\Collection|\App\Models\VideoComment[] $comments
+ * @property \App\Models\Course                                                  $course
+ * @property \App\User                                                           $user
+ *
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Video newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Video newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Video published()
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Video query()
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Video show()
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Video whereAliyunVideoId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Video whereChapterId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Video whereCharge($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Video whereCourseId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Video whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Video whereDeletedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Video whereDescription($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Video whereDuration($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Video whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Video whereIsShow($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Video wherePublishedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Video whereSeoDescription($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Video whereSeoKeywords($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Video whereShortDescription($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Video whereSlug($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Video whereTencentVideoId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Video whereTitle($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Video whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Video whereUrl($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Video whereUserId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|\App\Models\Video whereViewNum($value)
+ * @mixin \Eloquent
+ */
 class Video extends Model
 {
     const IS_SHOW_YES = 1;
@@ -27,11 +87,13 @@ class Video extends Model
         'url', 'view_num', 'short_description', 'description',
         'seo_keywords', 'seo_description', 'published_at',
         'is_show', 'charge', 'aliyun_video_id',
+        'chapter_id', 'duration', 'tencent_video_id',
     ];
 
-    protected $appends = [
-        'edit_url', 'destroy_url',
-    ];
+    public function getPublishedAtAttribute($publishedAt)
+    {
+        return Carbon::parse($publishedAt);
+    }
 
     /**
      * 所属用户.
@@ -77,22 +139,20 @@ class Video extends Model
         return $query->where('published_at', '<=', date('Y-m-d H:i:s'));
     }
 
-    public function getEditUrlAttribute()
-    {
-        return route('backend.video.edit', $this);
-    }
-
-    public function getDestroyUrlAttribute()
-    {
-        return route('backend.video.destroy', $this);
-    }
-
     /**
      * @return \Illuminate\Database\Eloquent\Relations\HasMany
      */
     public function comments()
     {
         return $this->hasMany(VideoComment::class, 'video_id');
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     */
+    public function chapter()
+    {
+        return $this->belongsTo(CourseChapter::class, 'chapter_id');
     }
 
     /**
@@ -121,5 +181,43 @@ class Video extends Model
         ]));
 
         return $comment;
+    }
+
+    /**
+     * 获取视频的播放地址[阿里云|本地].
+     *
+     * @return array
+     */
+    public function getPlayInfo()
+    {
+        if ($this->aliyun_video_id != '') {
+            $playInfo = aliyun_play_url($this);
+            Log::info(json_encode($playInfo));
+
+            return $playInfo;
+        }
+
+        return [
+            [
+                'format' => pathinfo($this->url, PATHINFO_EXTENSION),
+                'url' => $this->url,
+                'duration' => 0,
+            ],
+        ];
+    }
+
+    /**
+     * 获取视频播放地址
+     *
+     * @return mixed
+     */
+    public function getPlayUrl()
+    {
+        if ($this->url) {
+            return $this->url;
+        }
+        $playInfo = aliyun_play_url($this);
+
+        return isset($playInfo[0]) ? $playInfo[0]['url'] : '';
     }
 }

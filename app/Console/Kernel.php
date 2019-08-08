@@ -17,6 +17,22 @@ use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 class Kernel extends ConsoleKernel
 {
     /**
+     * The bootstrap classes for the application.
+     *
+     * @var array
+     */
+    protected $bootstrappers = [
+        \Illuminate\Foundation\Bootstrap\LoadEnvironmentVariables::class,
+        \Illuminate\Foundation\Bootstrap\LoadConfiguration::class,
+        \Illuminate\Foundation\Bootstrap\HandleExceptions::class,
+        \Illuminate\Foundation\Bootstrap\RegisterFacades::class,
+        \Illuminate\Foundation\Bootstrap\SetRequestForConsole::class,
+        \Illuminate\Foundation\Bootstrap\RegisterProviders::class,
+        \Illuminate\Foundation\Bootstrap\BootProviders::class,
+        \App\Meedu\AddonsProvider::class,
+    ];
+
+    /**
      * The Artisan commands provided by your application.
      *
      * @var array
@@ -32,9 +48,20 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule)
     {
         // 定时备份[每天凌晨5点]
-        $schedule->command('backup:run')
+        $schedule->command('meedu:backup')
+            ->withoutOverlapping()
+            ->onOneServer()
             ->dailyAt('05:00')
             ->appendOutputTo(storage_path('logs/backup'));
+
+        // PING
+        $schedule->command('ping')->dailyAt('06:00');
+
+        // 每30分钟
+        $schedule->command('order:pay:timeout')->everyThirtyMinutes()->appendOutputTo(storage_path('logs/order_pay_timeout'));
+
+        // AdFrom 数据同步
+        $schedule->command('adfrom:sync')->everyThirtyMinutes();
     }
 
     /**
