@@ -11,7 +11,7 @@
 
 namespace App\Events;
 
-use App\Models\OrderRemoteRelation;
+use App\Models\Order;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Foundation\Events\Dispatchable;
@@ -19,18 +19,18 @@ use Illuminate\Broadcasting\InteractsWithSockets;
 
 class PaymentSuccessEvent
 {
-    use Dispatchable, InteractsWithSockets, SerializesModels;
+    use Dispatchable;
+    use InteractsWithSockets;
+    use SerializesModels;
 
-    public $payment;
+    public $order;
 
     /**
      * Create a new event instance.
      */
-    public function __construct($payment, $thirdId)
+    public function __construct(Order $order)
     {
-        $this->payment = OrderRemoteRelation::wherePayment($payment)
-            ->whereRemoteId($thirdId)
-            ->first();
+        $this->order = $order;
     }
 
     /**

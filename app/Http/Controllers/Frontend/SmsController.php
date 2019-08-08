@@ -43,6 +43,11 @@ class SmsController extends FrontendController
         return $this->sendHandler($mobile, 'sms_password_reset', 'password_reset');
     }
 
+    public function sendMobileBind($mobile)
+    {
+        return $this->sendHandler($mobile, 'sms_mobile_bind', 'mobile_bind');
+    }
+
     /**
      * 发送验证码逻辑.
      *
@@ -62,7 +67,7 @@ class SmsController extends FrontendController
         $config = config('sms');
         $easySms = new EasySms($config);
         $data = [
-            'content' => "您的验证码为：{$code}",
+            'content' => str_replace('#code#', $code, $config['gateways'][$config['default']['gateways'][0]]['template'][$templateId]),
             'template' => $config['gateways'][$config['default']['gateways'][0]]['template'][$templateId],
             'data' => ['code' => $code],
         ];

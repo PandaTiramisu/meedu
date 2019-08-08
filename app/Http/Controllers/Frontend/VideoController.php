@@ -19,6 +19,17 @@ use App\Http\Requests\Frontend\CourseOrVideoCommentCreateRequest;
 
 class VideoController extends FrontendController
 {
+    public function index()
+    {
+        $videos = $video = Video::with(['course'])
+            ->published()
+            ->show()
+            ->orderByDesc('published_at')
+            ->paginate(16);
+
+        return v('frontend.video.index', compact('videos'));
+    }
+
     public function show($courseId, $id, $slug)
     {
         $video = Video::with(['course', 'comments', 'user', 'comments.user'])
@@ -29,8 +40,13 @@ class VideoController extends FrontendController
         $title = sprintf('视频《%s》', $video->title);
         $keywords = $video->keywords;
         $description = $video->description;
+        $comments = $video->comments()->orderByDesc('created_at')->get();
 
-        return view('frontend.video.show', compact('video', 'title', 'keywords', 'description'));
+        // 视频观看次数[UV]
+        $video->view_num++;
+        $video->save();
+
+        return v('frontend.video.show', compact('video', 'title', 'keywords', 'description', 'comments'));
     }
 
     public function commentHandler(CourseOrVideoCommentCreateRequest $request, $videoId)
@@ -47,7 +63,7 @@ class VideoController extends FrontendController
         $video = Video::findOrFail($id);
         $title = sprintf('购买视频《%s》', $video->title);
 
-        return view('frontend.video.buy', compact('video', compact('title')));
+        return v('frontend.video.buy', compact('video', compact('title')));
     }
 
     public function buyHandler(VideoRepository $repository, $id)

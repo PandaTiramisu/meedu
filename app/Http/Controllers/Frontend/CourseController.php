@@ -15,7 +15,6 @@ use App\Models\Order;
 use App\Models\Course;
 use Illuminate\Support\Facades\Auth;
 use App\Repositories\CourseRepository;
-use App\Http\Requests\Frontend\CourseOrVideoCommentCreateRequest;
 
 class CourseController extends FrontendController
 {
@@ -27,7 +26,7 @@ class CourseController extends FrontendController
             ->paginate(6);
         ['title' => $title, 'keywords' => $keywords, 'description' => $description] = config('meedu.seo.course_list');
 
-        return view('frontend.course.index', compact('courses', 'title', 'keywords', 'description'));
+        return v('frontend.course.index', compact('courses', 'title', 'keywords', 'description'));
     }
 
     public function show($id, $slug)
@@ -40,22 +39,15 @@ class CourseController extends FrontendController
         $title = sprintf('课程《%s》', $course->title);
         $keywords = $course->keywords;
         $description = $course->description;
+        $comments = $course->comments()->orderByDesc('created_at')->get();
 
-        return view('frontend.course.show', compact(
+        return v('frontend.course.show', compact(
             'course',
             'title',
             'keywords',
-            'description'
+            'description',
+            'comments'
         ));
-    }
-
-    public function commentHandler(CourseOrVideoCommentCreateRequest $request, $courseId)
-    {
-        $course = Course::findOrFail($courseId);
-        $comment = $course->commentHandler($request->input('content'));
-        $comment ? flash('评论成功', 'success') : flash('评论失败');
-
-        return back();
     }
 
     public function showBuyPage($id)
@@ -63,7 +55,7 @@ class CourseController extends FrontendController
         $course = Course::findOrFail($id);
         $title = sprintf('购买课程《%s》', $course->title);
 
-        return view('frontend.course.buy', compact('course', 'title'));
+        return v('frontend.course.buy', compact('course', 'title'));
     }
 
     public function buyHandler(CourseRepository $repository, $id)

@@ -1,22 +1,20 @@
 <template>
-    <div style="margin-top: 15px;">
-        <el-radio-group v-model="show">
-            <el-radio-button label="使用阿里云视频服务"></el-radio-button>
-            <el-radio-button label="直接使用URL地址"></el-radio-button>
-        </el-radio-group>
-        <el-form-item v-show="show == '使用阿里云视频服务'" label="请选择视频文件（不修改请勿操作）">
+    <div>
+        <label><input type="radio" value="使用阿里云视频服务" v-model="show">使用阿里云视频服务</label>
+        <label><input type="radio" value="直接使用URL地址" v-model="show">直接使用URL地址</label>
+
+        <div v-show="show == '使用阿里云视频服务'">
             <input type="file" name="file" id="video_files"/>
             <p>上传进度：<span id="upload-progress">暂无</span></p>
-            <input type="hidden" name="aliyun_video_id" id="video_id" v-model="video_id">
-
-            <el-col :span="24">
-                <el-button type="success" id="start-upload">开始上传</el-button>
-                <el-button type="danger" id="stop-upload">停止上传</el-button>
-            </el-col>
-        </el-form-item>
-        <el-form-item v-show="show == '直接使用URL地址'" label="请输入视频播放地址">
-            <el-input typeof="text" name="url" v-model="url" placeholder="请输入视频播放地址"></el-input>
-        </el-form-item>
+            <input type="text" name="aliyun_video_id" id="video_id" v-model="video_id">
+            <div>
+                <button type="button" class="btn btn-success" id="start-upload">开始上传</button>
+                <button type="button" class="btn btn-success" id="stop-upload">停止上传</button>
+            </div>
+        </div>
+        <div v-show="show == '直接使用URL地址'">
+            <input type="text" name="url" v-model="url" placeholder="请输入视频播放地址">
+        </div>
     </div>
 </template>
 
@@ -26,7 +24,7 @@
             'video',
         ],
         created() {
-            this.video_id = this.video.video_id;
+            this.video_id = this.video.aliyun_video_id;
             this.url = this.video.url;
             this.showTab();
         },
